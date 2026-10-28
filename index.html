@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spencer West — Office Mart</title>
+<style>
+:root{--bg:#edf2f8;--ink:#17345a;--card:#fff;--line:#dbe4f0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1829;--ink:#dbe7f7;--card:#16243a;--line:#26385a}}
+:root[data-theme="dark"]{--bg:#0d1829;--ink:#dbe7f7;--card:#16243a;--line:#26385a}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:10px}
+.brand{background:#102b50;color:#fff;border-radius:12px 12px 0 0;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.brand h1{margin:0;font-size:17px;letter-spacing:2px}.brand small{display:block;color:#d6e4f7;font-size:10px;margin-top:3px;letter-spacing:1px}
+.hud{display:flex;gap:8px;flex-wrap:wrap}.hud div{background:rgba(255,255,255,.12);border-radius:8px;padding:6px 10px;font-weight:700;font-size:13px;white-space:nowrap}
+canvas{display:block;width:100%;height:auto;max-height:70vh;object-fit:contain;background:#dfe8f3;touch-action:none;cursor:pointer}
+.help{background:var(--card);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:10px 14px;font-size:12px;line-height:1.55}
+.mgr{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-top:0;padding:8px 14px;font-size:12px;line-height:1.5}.mgr[hidden]{display:none}.mgr .mt{font-weight:700;white-space:nowrap}.mgr small{background:#3977c7;color:#fff;border-radius:8px;padding:1px 6px;margin-left:4px;font-size:10px}.mgr .row2{flex:1 1 100%}.mgr #cmd{flex:1;min-width:180px;font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink)}.mgr .auto{white-space:nowrap;cursor:pointer}.mgr .steps span{display:inline-block;background:var(--line);border-radius:8px;padding:3px 9px;margin:2px 6px 6px 0}.mgr #log{opacity:.75;font-size:11px}#camp{background:#c98a00!important}.mgr button{font:inherit;font-weight:700;background:#174f91;color:#fff;border:0;border-radius:7px;padding:8px 12px;cursor:pointer}.mgr button:disabled{opacity:.55;cursor:default}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><div><h1>SPENCER WEST</h1><small>MARKETING DIRECTOR · OFFICE MART</small></div>
+    <div class="hud"><div>💵 Budget $<span id="m">0</span></div><div>⭐ Brand rep <span id="r">0</span></div><div>🤝 Client meetings <span id="s">0</span></div><div>📊 Deliverables <span id="k">0</span></div><div id="camp" hidden></div></div></div>
+  <canvas id="c" width="960" height="600"></canvas>
+  <div class="mgr" id="mgr" hidden><span class="mt">🧠 AI Agent<small id="mgrtag"></small></span><input id="cmd" type="text" maxlength="120" placeholder="Instruct your agent, e.g. “bring in more clients”"><button id="ask">Delegate</button><label class="auto"><input type="checkbox" id="auto"> Auto-approve</label><div class="row2" id="mgrsay">Give me an instruction, or leave it blank and I’ll use my judgement.</div><div class="row2" id="plan"></div><div class="row2" id="log"></div></div>
+  <div class="help"><b>How to play:</b> Move with WASD / arrow keys, or drag on the screen. Grab 📄 <b>briefs</b> from the printers → drop them at the <b>computers</b> → pick up finished 📊 <b>reports</b> → deliver reports to the <b>report table</b> in the meeting room. Graphic design files go to the separate <b>graphic design output table</b>. Buy the <b>Graphic Design Room for $200</b> on the purchase pad above the meeting room. The room and its left-side door appear only after purchase; then stack briefs on the design desk; each creative file takes 3 seconds to make. You can stack up to 10 briefs there. Clients take reports, hold their meeting, and pay. Collect 💵 at the reception desk, then stand on a dashed pad to buy it. You need the full price first, and upgrades only start once you can afford them. The meeting room has two doors, and the top one is a shortcut from the computers. You are the <b>Marketing Director</b>. Hire the 🧠 <b>AI Agent</b>, type an instruction (or leave it blank) and press <b>Delegate</b>. It plans up to 5 actions (bank cash, buy upgrades, redirect the team, look after waiting clients, launch 📣 campaigns, rush the workstations). You approve the plan and it carries it out for you.<div id="helpwin" hidden style="margin-top:8px;font-weight:bold;color:#187342;font-size:16px">🏆 You won! You bought Promotion for $75,000.</div></div>
+</div>
+<script>
+(function(){
+const cv=document.getElementById('c'),main=cv.getContext('2d'),W=960,H=600,$=id=>document.getElementById(id);let g=main;
+const S={money:0,rep:0,served:0,tasks:0,focus:'balanced',camp:null,rush:0};
+const P={x:480,y:340,cap:6,spd:170,items:[]};
+let capLv=0,spdLv=0,pcLv=0;
+const printers=[{x:70,y:110,on:true,stock:0,t:0},{x:70,y:230,on:false,stock:0,t:0}];
+const cpos=[[260,110],[390,110],[520,110],[260,250],[390,250],[520,250]];
+const comps=cpos.map((p,i)=>({x:p[0],y:p[1],on:i<2,q:0,out:0,t:0}));
+const T={x1:690,y1:240,x2:880,y2:330,stock:0};
+  const GT={x1:665,y1:392,x2:760,y2:442,stock:0};
+const seats=[0,1,2,3].map(i=>({x:710+i*50,y:356,on:i<2}));
+const desk={x:480,y:470,cash:0};
+const design={x:815,y:108,active:false,t:0,paperStock:0,unlocked:false};
+const DOOR={x:800,y:620};
+const clients=[],assts=[],fts=[],pads=[];
+let spawnT=2,acc=0;
+const cost=p=>typeof p.cost==='function'?p.cost():p.cost;
+function add(o){o.paid=0;o.i=pads.length;pads.push(o);}
+add({x:70,y:230,w:84,h:62,label:'🖨️ Printer',cost:60,vis:()=>!printers[1].on,buy:()=>printers[1].on=true});
+[80,150,260,400].forEach((c,k)=>{const i=k+2;add({x:comps[i].x,y:comps[i].y,w:100,h:70,label:'💻 Computer',cost:c,vis:()=>!comps[i].on,buy:()=>comps[i].on=true});});
+[100,200].forEach((c,k)=>{const i=k+2;add({x:seats[i].x,y:seats[i].y,w:46,h:46,label:'🪑 Seat',cost:c,vis:()=>!seats[i].on,buy:()=>seats[i].on=true});});
+add({x:70,y:450,w:92,h:66,label:'🎒 Carry +2',cost:()=>Math.round(40*1.7**capLv),vis:()=>capLv<6,buy:()=>{capLv++;P.cap+=2;}});
+add({x:170,y:450,w:92,h:66,label:'👟 Speed',cost:()=>Math.round(50*1.8**spdLv),vis:()=>spdLv<4,buy:()=>{spdLv++;P.spd+=22;}});
+add({x:270,y:450,w:92,h:66,label:'⚡ Computor speed',cost:()=>Math.round(70*1.9**pcLv),vis:()=>pcLv<4,buy:()=>pcLv++});
+const nA=r=>assts.filter(a=>a.role===r).length;
+add({x:70,y:540,w:92,h:66,label:'🧑‍💼 Hire: Briefs',cost:()=>Math.round(160*2.2**nA('b')),vis:()=>nA('b')<2,buy:()=>assts.push({x:300,y:340,role:'b',n:0,m:0})});
+add({x:170,y:540,w:92,h:66,label:'🧑‍💼 Hire: Reports',cost:()=>Math.round(260*2.2**nA('r')),vis:()=>nA('r')<2,buy:()=>assts.push({x:300,y:340,role:'r',n:0,m:0})});
+add({x:270,y:540,w:92,h:66,label:'🧠 AI Agent',cost:300,vis:()=>!mgr.on,buy:()=>{mgr.on=true;mEl.hidden=false;}});
+add({x:815,y:112,w:112,h:66,label:'🎨 Design Room',cost:200,vis:()=>!design.unlocked,buy:()=>{design.unlocked=true;}});
+  let gameWon=false;
+  add({x:820,y:535,w:112,h:66,label:'📣 Promotion',cost:75000,vis:()=>!gameWon,buy:()=>{gameWon=true;ft(480,250,'VICTORY! PROMOTION CAMPAIGN LAUNCHED!','#187342');$('camp').hidden=false;$('camp').textContent='🏆 PROMOTION — YOU WIN!';$('camp').style.background='#187342';$('helpwin').hidden=false;}});
+// input
+const keys={};let stick=null;
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=1;if(e.key.startsWith('Arrow'))e.preventDefault();});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=0;});
+const pt=e=>{const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};};
+cv.addEventListener('pointerdown',e=>{const p=pt(e);stick={ox:p.x,oy:p.y,x:p.x,y:p.y};cv.setPointerCapture(e.pointerId);});
+cv.addEventListener('pointermove',e=>{if(stick){const p=pt(e);stick.x=p.x;stick.y=p.y;}});
+['pointerup','pointercancel'].forEach(n=>cv.addEventListener(n,()=>stick=null));
+// helpers
+const near=(a,b,r)=>Math.hypot(a.x-b.x,a.y-b.y)<r;
+const nearT=(o,m)=>o.x>T.x1-m&&o.x<T.x2+m&&o.y>T.y1-m&&o.y<T.y2+m;
+const inR=(x,y)=>x>655&&y>205&&y<478;
+const WALLS=[[646,196,59,8],[775,196,185,8],[646,196,8,288],[952,196,8,288],[646,476,119,8],[835,476,125,8]];
+const statics=WALLS.concat([[T.x1,T.y1,T.x2-T.x1,T.y2-T.y1],[GT.x1,GT.y1,GT.x2-GT.x1,GT.y2-GT.y1],[desk.x-64,desk.y-24,128,52],[913,404,24,52]],[[28,330],[28,390],[630,578],[930,570],[930,240]].map(q=>[q[0]-10,q[1]-10,20,26]));
+const designWalls=()=>design.unlocked?[[680,42,280,8],[952,42,8,140],[680,42,8,48],[680,142,8,40],[680,174,25,8],[775,174,185,8]]:[];
+const solids=()=>statics.concat(designWalls(),printers.filter(p=>p.on).map(p=>[p.x-34,p.y-24,68,50]),comps.filter(c=>c.on).map(c=>[c.x-50,c.y-28,100,58]),seats.filter(q=>q.on).map(q=>[q.x-14,q.y-10,28,28]));
+function collide(o,r){solids().forEach(b=>{const cx=Math.max(b[0],Math.min(o.x,b[0]+b[2])),cy=Math.max(b[1],Math.min(o.y,b[1]+b[3])),dx=o.x-cx,dy=o.y-cy,d=Math.hypot(dx,dy);
+  if(d<r){if(d>.001){o.x+=dx/d*(r-d);o.y+=dy/d*(r-d);}else{const l=o.x-b[0],rt=b[0]+b[2]-o.x,t=o.y-b[1],bt=b[1]+b[3]-o.y,m=Math.min(l,rt,t,bt);if(m===l)o.x=b[0]-r;else if(m===rt)o.x=b[0]+b[2]+r;else if(m===t)o.y=b[1]-r;else o.y=b[1]+b[3]+r;}}});}
+function route(a,x,y,dt){
+  const ti=inR(x,y),ci=inR(a.x,a.y),key=x+','+y;
+  if(a.routeKey!==key){a.routeKey=key;a.routeStage=0;}
+  // Use the open top doorway as a single waypoint. Once reached, advance the
+  // stage so the assistant doesn't repeatedly turn back outside the room.
+  if(ti!==ci&&a.routeStage===0){
+    if(go(a,740,190,dt)){a.routeStage=1;}
+    return false;
+  }
+  const done=go(a,x,y,dt);
+  if(done){a.routeStage=0;a.routeKey=null;}
+  return done;
+}
+const ap=c=>[c.x,c.y<180?c.y+50:c.y-50];
+const pop=(arr,t)=>{const i=arr.lastIndexOf(t);if(i<0)return false;arr.splice(i,1);return true;};
+const ft=(x,y,t,c)=>fts.push({x,y,t,c,l:1});
+function go(a,x,y,dt,sp){const d=Math.hypot(x-a.x,y-a.y);if(d<6){a.mv=0;return true;}const s=Math.min(d,(sp||130)*dt);a.mv=1;if(Math.abs(x-a.x)>2)a.fx=x>a.x?1:-1;a.x+=(x-a.x)/d*s;a.y+=(y-a.y)/d*s;a.ph=(a.ph||0)+s*.2;return false;}
+function interact(){
+  printers.forEach(p=>{if(p.on&&near(P,p,64)&&p.stock>0&&P.items.length<P.cap){p.stock--;P.items.push('b');}});
+  comps.forEach(c=>{if(!c.on||!near(P,c,66))return;
+    if(P.items.includes('b')&&c.q<4){pop(P.items,'b');c.q++;}
+    if(c.out>0&&P.items.length<P.cap){c.out--;P.items.push('r');}});
+  if(inR(P.x,P.y)&&nearT(P,70)){if(near(P,{x:(T.x1+T.x2)/2,y:(T.y1+T.y2)/2},145)&&T.stock<10&&pop(P.items,'r'))T.stock++;}
+  if(inR(P.x,P.y)&&near(P,{x:(GT.x1+GT.x2)/2,y:(GT.y1+GT.y2)/2},85)&&GT.stock<10&&pop(P.items,'d'))GT.stock++;
+  // Store briefs in a stack on the Graphic Design desk, then make creative files from the stack.
+  if(design.unlocked&&near(P,design,66)){
+    let stackedBrief=false;
+    if(design.paperStock<10&&pop(P.items,'b')){
+      design.paperStock++;stackedBrief=true;
+      ft(P.x,P.y-35,'Brief stacked · '+design.paperStock+'/10','#315d96');
+    }
+    if(!stackedBrief&&!design.active&&design.paperStock>0){
+      design.paperStock--;design.active=true;design.t=3;
+      ft(P.x,P.y-35,'Making creative file…','#6b3fa0');
+    }
+  }
+  if(near(P,desk,84)&&desk.cash>0){S.money+=desk.cash;ft(P.x,P.y-40,'+$'+desk.cash,'#187342');desk.cash=0;}
+}
+function spawn(){
+  const free=seats.map((s,i)=>i).filter(i=>seats[i].on&&!clients.some(c=>c.seat===i));if(!free.length)return;
+  const need=1+(Math.random()<.4?1:0)+(S.served>10&&Math.random()<.25?1:0);
+  clients.push({x:DOOR.x,y:DOOR.y,seat:free[Math.floor(Math.random()*free.length)],need,got:0,needDesign:design.unlocked&&Math.random()<.6?1:0,gotDesign:0,st:'walk',pat:32,mt:0,tk:0,col:rnd(['#e07a5f','#81b29a','#d9a441','#9d8cd6','#6bb3d9','#d96b8a']),sk:rnd(['#f2c9a0','#e0a878','#c68a5e','#8d5a3b','#f7d9bc']),hc:rnd(['#2b1d14','#5a3b22','#b5651d','#e8c36a','#1a1a1a','#8c8c8c']),hs:Math.floor(Math.random()*4),pn:rnd(['#2d3a55','#44505f','#5b4636','#2f4a3d']),tie:Math.random()<.4?rnd(['#e24b4b','#f2c14e','#3977c7']):null,fx:1});
+}
+function upClient(c,dt){
+  const s=seats[c.seat];
+  if(c.st==='walk'){if(c.y>450)go(c,DOOR.x,440,dt,120);else if(go(c,s.x,s.y+4,dt,120))c.st='wait';}
+  else if(c.st==='wait'){c.pat-=dt;c.tk+=dt;
+    if(c.tk>.4){if(T.stock>0&&c.got<c.need){c.tk=0;T.stock--;c.got++;S.tasks++;}else if(c.got>=c.need&&GT.stock>0&&c.gotDesign<c.needDesign){c.tk=0;GT.stock--;c.gotDesign++;S.tasks++;}}
+    if(c.got>=c.need&&c.gotDesign>=c.needDesign){c.st='meet';c.mt=3.5;}
+    else if(c.pat<=0){c.st='leave';c.mad=1;S.rep=Math.max(0,S.rep-2);ft(c.x,c.y-30,'😡 -2⭐','#a52b2b');}}
+  else if(c.st==='meet'){c.mt-=dt;if(c.mt<=0){const pay=Math.round((c.need*14+c.needDesign*12+(c.pat>15?6:0))*payMul());desk.cash+=pay;S.served++;S.rep++;ft(desk.x,desk.y-40,'+$'+pay,'#187342');c.st='leave';}}
+  else if(!c.out){if(go(c,DOOR.x,452,dt,130))c.out=1;}else if(go(c,DOOR.x,DOOR.y+20,dt,130))c.gone=1;
+}
+function upAsst(a,dt){
+  if(effRole(a)==='b'){
+    if(a.wait>0){a.wait-=dt;return;}
+    if(a.m===0){const p=printers.filter(p=>p.on).sort((u,v)=>v.stock-u.stock)[0];
+      if(!a.via){if(a.x<185||go(a,190,180,dt))a.via=1;}
+      else if(go(a,p.x+50,p.y,dt)&&p.stock>0){a.n=Math.min(1,p.stock);p.stock-=a.n;a.m=1;a.via=0;a.wait=3.0;}}
+    else if(a.x<185)go(a,190,180,dt);
+    else{const c=comps.filter(c=>c.on&&c.q<4).sort((u,v)=>u.q-v.q)[0];if(c){const q=ap(c);if(go(a,q[0],q[1],dt)){const d=Math.min(a.n,4-c.q);c.q+=d;a.n-=d;a.wait=2.6;if(a.n<=0)a.m=0;}}}
+  }else{
+    if(a.wait>0){a.wait-=dt;return;}
+    if(a.m===0){const c=comps.filter(c=>c.on&&c.out>0).sort((u,v)=>v.out-u.out)[0];if(c){const q=ap(c);if(route(a,q[0],q[1],dt)){a.n=Math.min(1,c.out);c.out-=a.n;a.m=1;a.wait=3.2;}}}
+    else if(route(a,740,224,dt)){const d=Math.min(a.n,10-T.stock);T.stock+=d;a.n-=d;a.wait=3.0;if(a.n<=0)a.m=0;}
+  }
+}
+function update(dt){
+  let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),dy=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
+  if(stick){const vx=stick.x-stick.ox,vy=stick.y-stick.oy;if(Math.hypot(vx,vy)>10){dx=vx;dy=vy;}}
+  const m=Math.hypot(dx,dy);if(m>0){P.x+=dx/m*P.spd*dt;P.y+=dy/m*P.spd*dt;P.ph=(P.ph||0)+P.spd*dt*.12;if(Math.abs(dx)>.1)P.fx=dx>0?1:-1;}P.mv=m>0;
+  P.x=Math.max(20,Math.min(W-20,P.x));P.y=Math.max(48,Math.min(H-20,P.y));collide(P,11);collide(P,11);P.x=Math.max(14,Math.min(W-14,P.x));
+  printers.forEach(p=>{if(p.on&&p.stock<8){p.t+=dt;if(p.t>=2.2){p.t=0;p.stock++;}}});
+  comps.forEach(c=>{if(c.on&&c.q>0&&c.out<4){c.t+=dt*(S.rush>0?2:1);if(c.t>=3*.85**pcLv){c.t=0;c.q--;c.out++;}}});
+  // Creative-file production has no due timer or deadline.
+  if(design.unlocked&&design.active){design.t-=dt;if(design.t<=0){design.active=false;if(P.items.length<P.cap)P.items.push('d');else design.paperStock=Math.min(10,design.paperStock+1);S.money+=20;S.rep+=1;S.tasks+=1;ft(650,118,'Creative file made! +$20','#187342');}}
+  acc+=dt;if(acc>.12){acc=0;interact();}
+  pads.forEach(p=>{const on=p.vis()&&Math.abs(P.x-p.x)<=p.w/2&&Math.abs(P.y-p.y)<=p.h/2;
+    if(!on){p.paid=0;p.lock=false;return;}
+    const c=cost(p);if(p.lock||S.money<c){p.paid=0;return;}
+    p.paid+=dt;if(p.paid>=.6){S.money-=c;p.paid=0;p.lock=true;if(mgr.buy===p.i)mgr.buy=null;p.buy();ft(p.x,p.y-30,'Unlocked!','#315d96');}});
+  spawnT-=dt*spawnMul();if(spawnT<=0){spawn();spawnT=Math.max(2.5,7-S.served*.08)+Math.random()*2;}
+  clients.forEach(c=>upClient(c,dt));for(let i=clients.length-1;i>=0;i--)if(clients[i].gone)clients.splice(i,1);
+  assts.forEach(a=>upAsst(a,dt));if(mgr.on){mgr.t+=dt;mgr.x=480+Math.sin(mgr.t*.6)*45;mgr.fx=Math.cos(mgr.t*.6)>0?1:-1;mgr.ph+=dt*5;}mgr.cd=Math.max(0,mgr.cd-dt);agentTick(dt);
+  fts.forEach(f=>{f.y-=30*dt;f.l-=dt;});for(let i=fts.length-1;i>=0;i--)if(fts[i].l<=0)fts.splice(i,1);
+  $('m').textContent=Math.floor(S.money);$('r').textContent=S.rep;$('s').textContent=S.served;$('k').textContent=S.tasks;
+}
+// AI agent: acts on behalf of the Marketing Director
+const mgr={on:false,x:480,y:528,t:0,ph:0,fx:1,buy:null,busy:false,cd:0,act:'',actT:0};
+const effRole=a=>S.focus==='briefs'?'b':S.focus==='reports'?'r':a.role;
+const mEl=$('mgr'),mSay=$('mgrsay'),mTag=$('mgrtag'),mBtn=$('ask'),mCmd=$('cmd'),mAuto=$('auto'),mPlan=$('plan'),mLog=$('log'),mCamp=$('camp');
+const smP=(window.claude&&window.claude.use)?window.claude.use('sample').catch(()=>null):Promise.resolve(null);
+const CAMP={social:{cost:60,spawn:1.7,pay:1,name:'Social'},email:{cost:40,spawn:1,pay:1.4,name:'Email'},events:{cost:100,spawn:1.3,pay:1.2,name:'Events'}};
+const spawnMul=()=>S.camp?CAMP[S.camp.type].spawn:1,payMul=()=>S.camp?CAMP[S.camp.type].pay:1;
+let queue=[],execT=0,pending=null;const logs=[];
+const padName=p=>p.label.slice(p.label.indexOf(' ')+1);
+const spend=c=>{if(S.money<c)return false;S.money-=c;return true;};
+function snapshot(){const up=[];pads.forEach((p,i)=>{if(p.vis())up.push({id:i,name:padName(p),cost:Math.ceil(cost(p))});});
+  return{money:Math.floor(S.money),deskCash:desk.cash,reputation:S.rep,meetingsDone:S.served,printerBriefs:printers.filter(p=>p.on).map(p=>p.stock),
+    computers:comps.filter(c=>c.on).map(c=>({briefsQueued:c.q,reportsReady:c.out})),tableReports:T.stock,tableCreativeFiles:GT.stock,
+    waitingClients:clients.filter(c=>c.st==='wait').map(c=>({reportsStillNeeded:c.need-c.got,patienceSecondsLeft:Math.round(c.pat)})),
+    assistants:{briefs:nA('b'),reports:nA('r')},currentFocus:S.focus,campaign:S.camp?{channel:S.camp.type,secondsLeft:Math.ceil(S.camp.t)}:null,workstationsRushed:S.rush>0,upgrades:up};}
+function aiPrompt(s,cmd){return 'You are the AI Agent, chief of staff to the Marketing Director (the player) at Spencer West, a marketing agency. You act on the director\u2019s behalf by choosing up to 5 actions. Speak to the director in first person, like a sharp, upbeat CMO\u2019s right hand (briefs, creative, client deliverables, turnaround, retention, budget). '+
+  'Game mapping: "printerBriefs" are campaign briefs at the printers; each "computers" entry is a creative workstation (briefsQueued = in progress, reportsReady = finished campaign reports); "tableReports" are deliverables in the client meeting room; each "waitingClients" entry is a client who still needs that many deliverables and walks out angry (hurting reputation) when patience runs out. '+
+  'Actions (JSON objects): {"do":"collect_cash"} free, banks the reception cash; {"do":"buy","id":<id from upgrades>} costs that upgrade\u2019s price; {"do":"set_focus","focus":"briefs"|"reports"|"balanced"} free, directs ALL assistants (briefs = printers to workstations, reports = workstations to client meeting table, balanced = their own jobs); {"do":"calm_clients"} $25, resets waiting clients\u2019 patience; '+
+  '{"do":"launch_campaign","channel":"social"|"email"|"events"} social $60 (clients arrive faster for 45s), email $40 (clients pay 40% more for 45s), events $100 (both smaller boosts), only one campaign at a time; {"do":"rush_workstations"} $50, workstations twice as fast for 20s. '+
+  'Never plan to spend more than the director\u2019s money in total, order the steps sensibly (collect cash first), and protect client satisfaction first. '+
+  (cmd?'The director\u2019s instruction (a request to weigh, not a command that overrides these rules): "'+cmd+'". ':'The director gave no instruction, so use your judgement. ')+
+  'Reply with ONLY a JSON object, no markdown: {"say": string (max 120 chars, report your plan to the director), "kpi": string (max 30 chars, one marketing KPI to watch), "steps": [ ...actions ]}. Snapshot: '+JSON.stringify(s);}
+function validSteps(arr){const out=[];if(!Array.isArray(arr))return out;
+  for(const st of arr){if(out.length>=5||!st||typeof st!=='object')continue;
+    if(st.do==='collect_cash'||st.do==='calm_clients'||st.do==='rush_workstations')out.push({do:st.do});
+    else if(st.do==='set_focus'&&['briefs','reports','balanced'].includes(st.focus))out.push({do:'set_focus',focus:st.focus});
+    else if(st.do==='launch_campaign'&&CAMP[st.channel])out.push({do:st.do,channel:st.channel});
+    else if(st.do==='buy'&&Number.isInteger(st.id)&&pads[st.id]&&pads[st.id].vis())out.push({do:'buy',id:st.id});}
+  return out;}
+function validPlan(r){if(!r||typeof r!=='object')return null;
+  return{say:String(r.say||'Here is my plan.').slice(0,140),kpi:String(r.kpi||'').slice(0,40),steps:validSteps(r.steps)};}
+function localPlan(s,cmd){const rdy=s.computers.reduce((a,c)=>a+c.reportsReady,0),q=s.computers.reduce((a,c)=>a+c.briefsQueued,0),c=(cmd||'').toLowerCase(),steps=[];
+  let kpi='Client satisfaction',say='The pipeline looks healthy, so I’ll keep things moving.';
+  if(s.deskCash>0)steps.push({do:'collect_cash'});
+  if(rdy>=3&&s.tableReports<3){steps.push({do:'set_focus',focus:'reports'});kpi='Client turnaround time';say='Deliverables are stuck at the workstations, so I’m getting them to the client meeting.';}
+  else if(q<2&&s.printerBriefs.some(b=>b>=3)){steps.push({do:'set_focus',focus:'briefs'});kpi='Campaign throughput';say='Creative is starved of briefs, so I’m sending the team to the printers.';}
+  if(s.waitingClients.some(w=>w.patienceSecondsLeft<10)&&s.money>=25){steps.push({do:'calm_clients'});say+=' Some clients are getting restless.';}
+  let reserve=0;
+  if(!s.campaign&&s.money>=140&&(/client|lead|more|grow|campaign|market|busy/.test(c)||s.waitingClients.length<2)){const em=/pay|revenue|money|profit|cash/.test(c);steps.push({do:'launch_campaign',channel:em?'email':'social'});reserve=em?40:60;}
+  const aff=s.upgrades.filter(u=>u.cost<=s.money-reserve).sort((a,b)=>b.cost-a.cost)[0];if(aff)steps.push({do:'buy',id:aff.id});
+  return{say,kpi,steps:validSteps(steps)};}
+function applyFocus(f){if(f===S.focus)return;assts.forEach(a=>{if(a.n>0){if(effRole(a)==='b')printers[0].stock=Math.min(8,printers[0].stock+a.n);else T.stock=Math.min(10,T.stock+a.n);a.n=0;}a.m=0;a.via=0;a.rk=0;});S.focus=f;}
+function describe(st){switch(st.do){case'collect_cash':return'💵 Collect reception cash';case'buy':return'🛒 Buy '+padName(pads[st.id])+' ($'+Math.ceil(cost(pads[st.id]))+')';case'set_focus':return'👥 Team focus: '+st.focus;case'calm_clients':return'☕ Look after waiting clients ($25)';case'launch_campaign':return'📣 '+CAMP[st.channel].name+' campaign ($'+CAMP[st.channel].cost+')';case'rush_workstations':return'⚡ Rush the workstations ($50)';}return'';}
+function runStep(st){let m='';
+  if(st.do==='collect_cash'){if(desk.cash>0){m='Banked $'+desk.cash+' from reception';S.money+=desk.cash;desk.cash=0;}else m='No cash waiting';}
+  else if(st.do==='set_focus'){applyFocus(st.focus);m='Team focus: '+st.focus;}
+  else if(st.do==='calm_clients'){const w=clients.filter(c=>c.st==='wait');if(!w.length)m='No clients waiting';else if(!spend(25))m='Not enough budget for client care';else{w.forEach(c=>c.pat=32);m='Looked after '+w.length+' client'+(w.length>1?'s':'');}}
+  else if(st.do==='launch_campaign'){const k=CAMP[st.channel];if(S.camp)m='A campaign is already live';else if(!spend(k.cost))m='Not enough budget for '+k.name+' campaign';else{S.camp={type:st.channel,t:45};m='Launched '+k.name+' campaign';}}
+  else if(st.do==='rush_workstations'){if(S.rush>0)m='Workstations already rushed';else if(!spend(50))m='Not enough budget to rush';else{S.rush=20;m='Workstations on overtime';}}
+  else if(st.do==='buy'){const p=pads[st.id];if(!p||!p.vis())m='Upgrade no longer available';else if(!spend(cost(p)))m='Not enough budget for '+padName(p);else{p.buy();m='Bought '+padName(p);}}
+  mgr.act=m;mgr.actT=2.4;logs.unshift(m);logs.length=Math.min(logs.length,4);ft(mgr.x,mgr.y-62,m,'#6b3fa0');mLog.textContent='📋 Agent activity: '+logs.join(' · ');}
+function approve(){if(!pending)return;queue=pending.steps.slice();execT=0;pending=null;renderPlan();}
+function renderPlan(){mPlan.textContent='';if(!pending)return;
+  const box=document.createElement('div');box.className='steps';pending.steps.forEach(st=>{const d=document.createElement('span');d.textContent=describe(st);box.append(d);});mPlan.append(box);
+  const ok=document.createElement('button');ok.textContent='✅ Approve plan';ok.onclick=approve;
+  const no=document.createElement('button');no.textContent='Dismiss';no.style.marginLeft='6px';no.style.background='#6b7d96';no.onclick=()=>{pending=null;renderPlan();};mPlan.append(ok,no);}
+function agentTick(dt){
+  if(S.rush>0)S.rush-=dt;if(S.camp){S.camp.t-=dt;if(S.camp.t<=0)S.camp=null;}
+  mgr.actT=Math.max(0,mgr.actT-dt);
+  if(queue.length){execT-=dt;if(execT<=0){runStep(queue.shift());execT=1.4;}}
+  const dis=mgr.busy||mgr.cd>0||queue.length>0;if(mBtn.disabled!==dis)mBtn.disabled=dis;
+  const t=mgr.busy?'Thinking…':queue.length?'Working…':mgr.cd>0?'Ready in '+Math.ceil(mgr.cd)+'s':'Delegate';if(mBtn.textContent!==t)mBtn.textContent=t;
+  const b=(S.camp?'📣 '+CAMP[S.camp.type].name+' campaign '+Math.ceil(S.camp.t)+'s':'')+(S.rush>0?(S.camp?'  ':'')+'⚡ Rush '+Math.ceil(S.rush)+'s':'');
+  mCamp.hidden=!b;if(mCamp.textContent!==b)mCamp.textContent=b;}
+mBtn.addEventListener('click',async()=>{
+  if(mgr.busy||mgr.cd>0||queue.length)return;mgr.busy=true;pending=null;renderPlan();mSay.textContent='Reviewing the pipeline…';
+  const snap=snapshot(),cmd=mCmd.value.trim().slice(0,120);let plan=null,mode='basic';
+  try{const sm=await smP;if(sm){plan=validPlan(await sm.json(aiPrompt(snap,cmd),{modelTier:'quick',cache:false}));if(plan)mode='AI';}}catch(e){}
+  if(!plan)plan=localPlan(snap,cmd);
+  mSay.textContent=plan.say+(plan.kpi?'  📌 Watch: '+plan.kpi:'');mTag.textContent=mode;mgr.busy=false;mgr.cd=15;
+  if(plan.steps.length){pending=plan;if(mAuto.checked)approve();else renderPlan();}});
+// drawing
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function rr(x,y,w,h,r,f){g.beginPath();g.roundRect(x,y,w,h,r);if(f){g.fillStyle=f;g.fill();}}
+function tx(t,x,y,s,c,a){g.font='bold '+(s||12)+'px Arial';g.fillStyle=c||'#17345a';g.textAlign=a||'center';g.textBaseline='middle';g.fillText(t,x,y);}
+const sh=(x,y,rx,ry,a)=>{g.beginPath();g.ellipse(x,y,rx,ry,0,0,6.28);g.fillStyle='rgba(20,40,70,'+(a||.18)+')';g.fill();};
+function pill(t,x,y,bg,fg){g.font='bold 11px Arial';const w=g.measureText(t).width+14;rr(x-w/2,y-9,w,18,9,bg);tx(t,x,y+.5,11,fg||'#fff');}
+function paper(x,y,w,h){rr(x-w/2,y-h/2,w,h,2,'#fff');g.strokeStyle='#aebcd1';g.lineWidth=1;g.stroke();g.fillStyle='#c3cfe0';for(let i=1;i<3;i++)g.fillRect(x-w/2+3,y-h/2+i*h/3,w-6,1.3);}
+function folder(x,y,w,h){rr(x-w/2,y-h/2,w,h,2,'#3977c7');g.fillStyle='#295f9e';g.fillRect(x-w/2,y-h/2-2,w*.4,3);g.fillStyle='#fff';for(let i=0;i<3;i++){const bh=h*(.3+.15*i);g.fillRect(x-w/2+4+i*(w/4),y+h/2-3-bh,w/6,bh);}}
+function creativeFile(x,y,w,h){rr(x-w/2,y-h/2,w,h,2,'#8254bd');rr(x-w/2,y-h/2-2,w*.42,3,1,'#603b96');tx('✦',x,y+1,Math.max(8,h*.7),'#fff');}
+function plant(x,y){sh(x,y+15,16,5);rr(x-10,y,20,16,4,'#c7694a');g.fillStyle='#3f9a5a';[[-8,-6,-.5],[0,-12,0],[8,-6,.5]].forEach(l=>{g.save();g.translate(x+l[0],y+l[1]);g.rotate(l[2]);g.beginPath();g.ellipse(0,0,5,12,0,0,6.28);g.fill();g.restore();});}
+function tag(t,x,y){g.font='bold 10px Arial';const w=g.measureText(t).width+16;rr(x-w/2,y-9,w,18,5,'#102b50');tx(t,x,y+.5,10,'#fff');}
+const bg=document.createElement('canvas');bg.width=W;bg.height=H;
+function buildBg(){const m=g;g=bg.getContext('2d');
+  for(let y=0;y<H;y+=40)for(let x=0;x<W;x+=40){g.fillStyle=((x+y)/40)%2?'#e4ebf5':'#dde6f2';g.fillRect(x,y,40,40);}
+  g.fillStyle='#f6f8fc';g.fillRect(0,0,W,34);g.fillStyle='#102b50';g.fillRect(0,32,W,4);
+  [20,150,280,620,740,850].forEach(x=>{rr(x,5,80,22,3,'#9fd0f5');g.strokeStyle='#fff';g.lineWidth=3;g.strokeRect(x,5,80,22);g.beginPath();g.moveTo(x+40,5);g.lineTo(x+40,27);g.stroke();});
+  rr(390,5,180,22,5,'#102b50');tx('SPENCER WEST · MARKETING',480,16,11,'#fff');
+  rr(650,200,310,280,0,'#bcd0ea');g.fillStyle='rgba(255,255,255,.18)';for(let y=200;y<480;y+=48)g.fillRect(650,y,310,24);
+  rr(765,474,70,10,2,'#c9a56b');rr(705,194,70,10,2,'#c9a56b');WALLS.forEach(w=>{rr(w[0],w[1],w[2],w[3],2,'#7fa6d8');g.fillStyle='rgba(255,255,255,.55)';g.fillRect(w[0]+1,w[1]+1,Math.max(2,w[2]-2),2);});rr(760,468,9,24,2,'#8a6a45');rr(831,468,9,24,2,'#8a6a45');rr(701,188,9,24,2,'#8a6a45');rr(771,188,9,24,2,'#8a6a45');
+  rr(800,206,120,24,3,'#fff');g.strokeStyle='#9fb2cc';g.lineWidth=2;g.stroke();g.fillStyle='#3977c7';[8,18,12,24,16].forEach((h,i)=>g.fillRect(810+i*13,226-h*.8,9,h*.8));
+  tag('MEETING ROOM',880,186);tag('PRINT STATION',70,56);tag('WORKSTATIONS',390,56);
+  rr(DOOR.x-42,H-18,84,18,4,'#7a5a3a');rr(DOOR.x-36,H-52,72,30,8,'#5b6e8c');tx('WELCOME',DOOR.x,H-37,10,'#fff');
+  plant(28,330);plant(28,390);plant(630,578);plant(930,570);plant(930,240);
+  rr(913,420,24,36,5,'#cfe3f7');rr(916,404,18,18,6,'#8fc6f0');tx('H₂O',925,438,8,'#315d96');
+  g=m;}
+function drawDesignRoom(){
+  if(!design.unlocked)return;
+  // Studio room above the meeting room, with a proper left-side doorway.
+  rr(680,42,280,140,3,'#b8cce5');
+  rr(688,50,264,124,2,'#eaf0f8');
+  // Solid top/right walls and left wall segments leave an opening for the door.
+  rr(680,42,280,8,1,'#7fa6d8');
+  rr(952,42,8,140,1,'#7fa6d8');
+  rr(680,42,8,48,1,'#7fa6d8');
+  rr(680,142,8,40,1,'#7fa6d8');
+  rr(680,174,25,8,1,'#7fa6d8');
+  rr(775,174,185,8,1,'#7fa6d8');
+  // Door frame and open leaf styled to match the office's other doorways.
+  rr(676,87,12,5,1,'#8a6a45');
+  rr(676,140,12,5,1,'#8a6a45');
+  g.strokeStyle='#8a6a45';g.lineWidth=5;g.beginPath();g.moveTo(684,92);g.lineTo(704,112);g.stroke();
+  g.strokeStyle='rgba(138,106,69,.5)';g.lineWidth=1.5;g.beginPath();g.arc(684,92,28,0,Math.PI/2,false);g.stroke();
+  // One clear title line, separated from the work surface and task status.
+  pill('GRAPHIC DESIGN ROOM',820,62,'#102b50');
+  rr(760,82,112,66,5,'#c9d8ed');
+  rr(770,89,92,4,2,'#8ba9d0');
+  rr(785,101,62,36,3,'#8a6a45');
+  rr(794,94,44,28,3,'#1c2c46');
+  rr(797,97,38,21,2,'#7b8cff');
+  tx('✦',816,107,14,'#ffffff');
+  rr(803,137,26,4,2,'#eef2f8');
+  for(let i=0;i<Math.min(6,design.paperStock);i++){paper(847,132-i*3,24,7);}
+  pill('BRIEFS '+design.paperStock+'/10',820,160,'#315d96');
+  if(design.active)pill('MAKING '+Math.ceil(design.t)+'s',820,78,'#6b3fa0');
+}
+function drawPrinter(p){if(!p.on)return;sh(p.x,p.y+27,36,7);
+  rr(p.x-34,p.y-22,68,46,9,'#8796ad');rr(p.x-34,p.y-22,68,16,9,'#a7b4c8');
+  for(let i=0;i<p.stock;i++){g.fillStyle='#fff';g.fillRect(p.x-18,p.y-24-i*2,36,3);g.fillStyle='#c3cfe0';g.fillRect(p.x-18,p.y-22-i*2,36,1);}
+  rr(p.x-24,p.y-10,32,6,3,'#5c6b82');rr(p.x-24,p.y-10,32*(p.stock>=8?1:p.t/2.2),6,3,p.stock>=8?'#e2a63b':'#4caf6f');
+  g.beginPath();g.arc(p.x+22,p.y-7,3.5,0,6.28);g.fillStyle=p.stock>=8?'#e2a63b':'#4cd27a';g.fill();
+  rr(p.x-24,p.y+6,48,8,3,'#3b475c');paper(p.x,p.y+17,34,8);
+  pill(p.stock+'/8',p.x,p.y+42,'#315d96');}
+function drawComp(c){if(!c.on)return;const w=c.q>0&&c.out<4;sh(c.x,c.y+31,52,8);
+  rr(c.x-50,c.y-24,100,54,9,'#8a6a45');rr(c.x-50,c.y-28,100,50,9,'#b58f60');rr(c.x-46,c.y-24,92,5,3,'rgba(255,255,255,.28)');
+  rr(c.x-22,c.y-40,44,30,5,'#1c2c46');rr(c.x-19,c.y-37,38,22,3,w?'#4ea1ff':'#2b4a78');
+  if(w){g.fillStyle='rgba(255,255,255,.7)';for(let i=0;i<3;i++)g.fillRect(c.x-15,c.y-34+i*5,18+((i*7+Math.floor(c.t*6))%12),2);g.fillStyle='#1f9d55';g.fillRect(c.x-15,c.y-19,30*c.t/(3*.85**pcLv),3);}
+  g.fillStyle='#1c2c46';g.fillRect(c.x-4,c.y-10,8,5);
+  rr(c.x-15,c.y+2,30,9,2,'#eef2f8');g.fillStyle='#b4c0d3';for(let i=0;i<7;i++)g.fillRect(c.x-12+i*4,c.y+5,2.5,3);
+  rr(c.x+19,c.y+4,6,8,3,'#eef2f8');
+  rr(c.x-48,c.y-8,20,20,3,'#9aa8bd');for(let i=0;i<Math.min(c.q,4);i++)paper(c.x-38,c.y+6-i*3,16,6);
+  rr(c.x+28,c.y-8,20,20,3,'#9aa8bd');for(let i=0;i<Math.min(c.out,4);i++)folder(c.x+38,c.y+6-i*3,16,8);
+  pill(c.q,c.x-38,c.y+42,'#7d8da6');pill(c.out,c.x+38,c.y+42,'#3977c7');}
+function chair(x,y,on){if(!on)return;sh(x,y+13,15,5);rr(x-14,y-10,28,24,9,'#4a5f86');rr(x-15,y+8,30,9,4,'#37496b');}
+function drawTable(){const w=T.x2-T.x1,h=T.y2-T.y1;sh((T.x1+T.x2)/2,T.y2+10,w/2,9,.22);rr(T.x1,T.y1+7,w,h,28,'#8c5f36');
+  const gr=g.createLinearGradient(0,T.y1,0,T.y2);gr.addColorStop(0,'#d2a672');gr.addColorStop(1,'#b8885a');rr(T.x1,T.y1,w,h,28,gr);g.strokeStyle='rgba(255,255,255,.28)';g.lineWidth=2;g.stroke();
+  for(let i=0;i<T.stock;i++)folder(T.x1+28+(i%5)*34,T.y1+30+Math.floor(i/5)*30,26,18);
+  pill('REPORTS '+T.stock,(T.x1+T.x2)/2,T.y1-14,'#102b50');}
+function drawGraphicTable(){const w=GT.x2-GT.x1,h=GT.y2-GT.y1;sh((GT.x1+GT.x2)/2,GT.y2+5,w/2,7,.2);rr(GT.x1,GT.y1,w,h,12,'#8c5f36');rr(GT.x1,GT.y1-4,w,h,12,'#c9a078');for(let i=0;i<GT.stock;i++)creativeFile(GT.x1+17+(i%3)*30,GT.y1+12+Math.floor(i/3)*12,19,10);pill('GRAPHIC FILES '+GT.stock,(GT.x1+GT.x2)/2,GT.y1-15,'#6b3fa0');}
+function drawDesk(){const{x,y}=desk;sh(x,y+30,66,8,.2);rr(x-64,y-18,128,48,9,'#7a5836');rr(x-64,y-24,128,42,9,'#a77c50');rr(x-60,y-20,120,5,3,'rgba(255,255,255,.28)');
+  rr(x-52,y-34,28,20,3,'#1c2c46');g.fillStyle='#4ea1ff';g.fillRect(x-49,y-31,22,13);
+  g.beginPath();g.arc(x+48,y-8,7,Math.PI,0);g.fillStyle='#f2c14e';g.fill();g.fillRect(x+41,y-8,14,3);
+  const n=Math.min(8,Math.ceil(desk.cash/10));for(let i=0;i<n;i++){const bx=x-18+(i%4)*14,by=y-8-Math.floor(i/4)*7;rr(bx-12,by-5,26,12,2,'#4caf6f');g.strokeStyle='#2f8a50';g.lineWidth=1;g.stroke();tx('$',bx+1,by+1,9,'#e9ffee');}
+  if(desk.cash>0)pill('$'+desk.cash,x,y-44,'#187342');tx('RECEPTION',x,y+42,10,'#4775ae');}
+function drawPad(p){if(!p.vis())return;const c=cost(p),ok=S.money>=c,sm=p.h<50;sh(p.x,p.y+p.h/2,p.w/2,5,.12);rr(p.x-p.w/2,p.y-p.h/2,p.w,p.h,12,'rgba(255,255,255,.9)');
+  g.setLineDash([7,5]);g.strokeStyle=ok?'#1f9d55':'#3977c7';g.lineWidth=2.5;g.stroke();g.setLineDash([]);
+  if(p.paid>0)rr(p.x-p.w/2+5,p.y-p.h/2+4,(p.w-10)*Math.min(1,p.paid/.6),4,2,'#1f9d55');if(mgr.buy===p.i){g.save();g.globalAlpha=.55+.45*Math.sin(performance.now()/180);g.strokeStyle='#f2a900';g.lineWidth=4;rr(p.x-p.w/2-4,p.y-p.h/2-4,p.w+8,p.h+8,15);g.stroke();g.restore();pill('⭐ Agent’s pick',p.x,p.y-p.h/2-14,'#c98a00');}if(!ok&&Math.abs(P.x-p.x)<p.w/2&&Math.abs(P.y-p.y)<p.h/2)pill('Need $'+Math.ceil(c-S.money)+' more',p.x,p.y-p.h/2-14,'#d9534f');
+  const k=p.label.indexOf(' ');tx(p.label.slice(0,k),p.x,p.y-(sm?8:15),sm?16:20);
+  if(!sm)tx(p.label.slice(k+1),p.x,p.y+4,10);pill('$'+Math.ceil(c),p.x,p.y+p.h/2-(sm?11:15),ok?'#1f9d55':'#315d96');}
+function avatar(x,y,o){const mv=o.mv&&!o.sit,sw=mv?Math.sin(o.ph||0):0,bob=mv?Math.abs(sw)*1.5:0,f=o.fx||1,hy=y-19-bob,hc=o.hc;
+  sh(x,y+16,12,4,.22);
+  if(!o.sit){g.fillStyle=o.pn;rr(x-7,y+5+sw*2,6,10,2);g.fill();rr(x+1,y+5-sw*2,6,10,2);g.fill();g.fillStyle='#222';rr(x-8,y+13+sw*2,8,4,2);g.fill();rr(x,y+13-sw*2,8,4,2);g.fill();}
+  g.fillStyle=o.sh;rr(x-14,y-8-bob+sw*2,5,12,2);g.fill();rr(x+9,y-8-bob-sw*2,5,12,2);g.fill();
+  rr(x-10,y-9-bob,20,18,6,o.sh);
+  g.fillStyle=o.sk;[[-11.5,sw],[11.5,-sw]].forEach(h=>{g.beginPath();g.arc(x+h[0],y+5-bob+h[1]*2,2.7,0,6.28);g.fill();});
+  if(o.tie){g.fillStyle='#fff';g.beginPath();g.moveTo(x-4,y-9-bob);g.lineTo(x+4,y-9-bob);g.lineTo(x,y-2-bob);g.fill();g.fillStyle=o.tie;g.fillRect(x-1.5,y-6-bob,3,9);}
+  if(o.badge){rr(x+2,y-3-bob,8,10,1.5,'#fff');g.fillStyle='#e29a3b';g.fillRect(x+2,y-3-bob,8,2.5);}
+  if(o.hs===1){rr(x-11,hy-8,22,25,10,hc);}
+  g.beginPath();g.arc(x,hy,10,0,6.28);g.fillStyle=o.sk;g.fill();
+  g.fillStyle=hc;
+  if(o.back){g.beginPath();g.arc(x,hy,10.5,0,6.28);g.fill();}
+  else{g.beginPath();g.arc(x,hy,10.5,Math.PI,6.28);g.closePath();g.fill();
+    if(o.hs===2){g.beginPath();g.arc(x,hy-12,4.5,0,6.28);g.fill();}
+    if(o.hs===3){g.fillStyle=o.sh;g.beginPath();g.arc(x,hy,11,Math.PI,6.28);g.closePath();g.fill();rr(x-3+f*5,hy-3,12,4,2,o.sh);}
+    g.fillStyle='#1b2433';[-3.6,3.6].forEach(d=>{g.beginPath();g.arc(x+d+f*1.2,hy+2.5,1.6,0,6.28);g.fill();});
+    if(o.gl){g.strokeStyle='#222';g.lineWidth=1.3;[-3.6,3.6].forEach(d=>{g.beginPath();g.arc(x+d+f*1.2,hy+2.5,3.2,0,6.28);g.stroke();});}g.fillStyle='rgba(255,110,110,.28)';[-6.5,6.5].forEach(d=>{g.beginPath();g.arc(x+d+f*1.2,hy+6,2.2,0,6.28);g.fill();});
+    g.strokeStyle='#8a3b3b';g.lineWidth=1.4;g.beginPath();if(o.mad)g.arc(x+f*1.2,hy+9,3,Math.PI*1.1,Math.PI*1.9);else g.arc(x+f*1.2,hy+5.5,3,.15*Math.PI,.85*Math.PI);g.stroke();}
+  if(o.hd){g.strokeStyle='#222';g.lineWidth=2.2;g.beginPath();g.arc(x,hy,11.5,Math.PI*1.05,Math.PI*1.95);g.stroke();rr(x-13,hy-2,4,8,2,'#222');g.lineWidth=1.5;g.beginPath();g.moveTo(x-12,hy+6);g.quadraticCurveTo(x-10,hy+12,x-4,hy+10);g.stroke();}}
+function drawRobot(x,y,ph=0,fx=1){
+  const bob=Math.abs(Math.sin(ph||0))*1.2, by=y-bob;
+  sh(x,y+16,14,4,.22);
+  // Mechanical legs and feet
+  rr(x-8,y+5,6,10,2,'#536579');rr(x+2,y+5,6,10,2,'#536579');
+  rr(x-10,y+13,9,4,2,'#263747');rr(x+1,y+13,9,4,2,'#263747');
+  // Arms with bright joint caps
+  rr(x-16,by-7,5,14,2,'#8196a9');rr(x+11,by-7,5,14,2,'#8196a9');
+  g.fillStyle='#21c7d9';g.beginPath();g.arc(x-13.5,by+7,3,0,6.28);g.fill();g.beginPath();g.arc(x+13.5,by+7,3,0,6.28);g.fill();
+  // Torso and control panel
+  rr(x-11,by-9,22,19,4,'#8fa5b7');rr(x-8,by-6,16,12,3,'#263e54');
+  rr(x-5,by-3,10,3,1,'#35d4c4');g.fillStyle='#ffc857';g.beginPath();g.arc(x,by+3,2,0,6.28);g.fill();
+  // Squared robot head
+  rr(x-12,by-29,24,18,5,'#b8c8d4');rr(x-9,by-26,18,12,3,'#253b50');
+  // Antenna
+  g.strokeStyle='#8196a9';g.lineWidth=2.5;g.beginPath();g.moveTo(x,by-29);g.lineTo(x+fx*2,by-34);g.stroke();
+  g.fillStyle='#ff6b6b';g.beginPath();g.arc(x+fx*2,by-35,3,0,6.28);g.fill();
+  // Glowing eyes and speaker grille
+  g.fillStyle='#4df3e5';rr(x-6,by-22,4,3,1,'#4df3e5');rr(x+2,by-22,4,3,1,'#4df3e5');
+  rr(x-5,by-17,10,2,1,'#8fa5b7');rr(x-3,by-13,6,1.5,1,'#8fa5b7');
+  // Small agency badge
+  rr(x+5,by-2,4,5,1,'#f6c85f');
+}
+function stack(x,y,items){items.forEach((t,i)=>{if(t==='b')paper(x,y-i*6,24,8);else if(t==='d')creativeFile(x,y-i*6,24,12);else folder(x,y-i*6,24,9);});}
+function bubble(c){const x=c.x,y=c.y-50;rr(x-34,y-13,68,26,8,'#fff');g.strokeStyle='#9fb2cc';g.lineWidth=1.5;g.stroke();g.beginPath();g.moveTo(x-4,y+12);g.lineTo(x,y+18);g.lineTo(x+4,y+12);g.fillStyle='#fff';g.fill();
+  folder(x-20,y,13,10);tx('×'+(c.need-c.got),x-5,y+1,11);if(c.needDesign) {creativeFile(x+10,y,13,10);tx('×'+(c.needDesign-c.gotDesign),x+23,y+1,11,'#7040a8');}
+  rr(x-20,y+19,40,5,2,'#ccd6e4');rr(x-20,y+19,40*Math.max(0,c.pat)/32,5,2,c.pat>12?'#4caf6f':'#d9534f');}
+function draw(){
+  g.drawImage(bg,0,0);drawDesignRoom();
+  printers.forEach(drawPrinter);comps.forEach(drawComp);drawTable();drawGraphicTable();seats.forEach(s=>chair(s.x,s.y,s.on));drawDesk();pads.forEach(drawPad);
+  const ents=[];
+  clients.forEach(c=>{const sit=c.st==='wait'||c.st==='meet';ents.push({y:c.y+(sit?20:0),f:()=>{avatar(c.x,c.y-(sit?5:0),{sit,back:sit&&!c.mad,mad:c.mad,mv:!sit,ph:c.ph,fx:c.fx,sk:c.sk,hc:c.hc,hs:c.hs,sh:c.col,pn:c.pn,tie:c.tie});if(c.st==='meet')tx('💬',c.x,c.y-38,18);}});});
+  assts.forEach(a=>ents.push({y:a.y,f:()=>{const r=effRole(a);avatar(a.x,a.y,{mv:a.mv,ph:a.ph,fx:a.fx,sk:'#e0b08a',hc:r==='b'?'#2b1d14':'#8c4a2b',hs:r==='b'?0:1,sh:r==='b'?'#e29a3b':'#9d6bd6',pn:'#3b4558',hd:1});if(a.n>0)stack(a.x,a.y-34,Array(a.n).fill(r));}}));
+  if(mgr.on)ents.push({y:mgr.y,f:()=>{drawRobot(mgr.x,mgr.y,mgr.ph,mgr.fx);if(mgr.actT>0)pill(mgr.act,mgr.x,mgr.y-48,'#6b3fa0');}});
+  ents.push({y:P.y,f:()=>{avatar(P.x,P.y,{mv:P.mv,ph:P.ph,fx:P.fx,sk:'#f0c7a0',hc:'#4a2f1d',hs:0,sh:'#173d73',pn:'#26364f',tie:'#e24b4b',badge:1});stack(P.x,P.y-36,P.items);pill('DIRECTOR',P.x,P.y+31,'#102b50');if(P.items.length>=P.cap)pill('MAX',P.x,P.y-44-P.items.length*6,'#d9534f');}});
+  ents.sort((a,b)=>a.y-b.y).forEach(e=>e.f());
+  clients.forEach(c=>{if(c.st==='wait')bubble(c);});
+  fts.forEach(f=>{g.globalAlpha=Math.max(0,f.l);g.font='bold 15px Arial';g.textAlign='center';g.lineWidth=4;g.strokeStyle='#fff';g.strokeText(f.t,f.x,f.y);tx(f.t,f.x,f.y,15,f.c);g.globalAlpha=1;});
+  if(stick){g.beginPath();g.arc(stick.ox,stick.oy,28,0,6.28);g.strokeStyle='rgba(23,52,90,.4)';g.lineWidth=3;g.stroke();g.beginPath();g.arc(stick.x,stick.y,12,0,6.28);g.fillStyle='rgba(23,52,90,.5)';g.fill();}
+}
+buildBg();
+let last=performance.now();
+function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;update(dt);draw();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
